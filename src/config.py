@@ -166,6 +166,107 @@ class Config:
         'case_sensitive': False
     }
     
+    # 目录命名配置
+    DIRECTORY_NAMING = {
+        'image_directories': {
+            'base_dir': 'images',
+            'structure_template': '{base_dir}/{doc_name}',
+            'naming_strategy': 'normalized',
+            'max_dir_name_length': 100
+        },
+        'document_type_configs': {
+            'pdf': {'dir_prefix': 'PDF'},
+            'docx': {'dir_prefix': 'Word'}
+        },
+    }
+
+    # 文件名规范化配置
+    FILENAME_NORMALIZATION = {
+        'enabled': True,
+        'max_filename_length': 200,  # 增加到200以支持更长的中文文件名
+        'convert_chinese_to_pinyin': False,
+        'remove_special_chars': True,
+        'replacement_chars': {
+            '（': '(',
+            '）': ')',
+            '：': '_',
+            '；': '_',
+            '，': '_',
+            '。': '.',
+            '？': '',
+            '！': '',
+            '【': '[',
+            '】': ']',
+            '《': '',
+            '》': '',
+            '"': '',
+            "'": '',
+            '\\': '_',
+            '/': '_',
+            '*': '_',
+            '?': '',
+            '<': '',
+            '>': '',
+            '|': '_',
+            ' ': '_',
+            '\t': '_',
+            '\n': '_',
+            '\r': '_'
+        }
+    }
+    
+    # Alt文本配置
+    ALT_TEXT_CONFIG = {
+        'use_simple_alt': True,  # 统一使用"image"作为alt文本
+        'simple_alt_text': 'image',
+        'max_alt_length': 30,
+        'preserve_original': False
+    }
+    
+    # 目录命名配置
+    DIRECTORY_NAMING = {
+        # 图片目录配置
+        'image_directories': {
+            'base_dir': 'images',  # 基础图片目录名
+            'structure_template': '{base_dir}/{doc_name}',  # 目录结构模板
+            'naming_strategy': 'normalized',  # 命名策略：normalized, original, custom
+            'use_document_type_prefix': False,  # 是否使用文档类型前缀
+            'max_dir_name_length': 255,  # 目录名最大长度（增加到100以支持更长的中文文件名）
+        },
+        
+        # 文件名长度配置
+        'filename_limits': {
+            'max_filename_length': 200,  # 文件名最大长度（统一配置）
+            'max_dir_name_length': 255,  # 目录名最大长度（与image_directories保持一致）
+        },
+        
+        # 不同文档类型的特殊配置
+        'document_type_configs': {
+            'pdf': {
+                'dir_prefix': '',
+                'use_page_info': False,
+            },
+            'docx': {
+                'dir_prefix': '',
+                'preserve_media_structure': False,
+            },
+            'pptx': {
+                'dir_prefix': '',
+                'slide_based_naming': False,
+            },
+            'xlsx': {
+                'dir_prefix': '',
+                'sheet_based_naming': False,
+            }
+        },
+        
+        # 通用目录配置
+        'sync_with_filename': True,  # 图片目录名与MD文件名保持一致
+        'normalize_directory_names': True,
+        'use_normalized_names': True,
+        'fallback_naming': 'sanitized'  # 规范化失败时的备用策略
+    }
+    
     @classmethod
     def get_absolute_path(cls, relative_path: str) -> Path:
         """获取相对于项目根目录的绝对路径

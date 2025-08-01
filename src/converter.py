@@ -21,6 +21,8 @@
 """
 
 import os
+
+import os
 import re
 from pathlib import Path
 from typing import Dict, List, Optional, Any, Tuple
@@ -86,7 +88,7 @@ class DocumentConverter:
         self._init_markitdown()
         
         # 初始化图片处理器
-        self.image_processor = ImageProcessor(logger=self.logger)
+        self.image_processor = ImageProcessor(Config.IMAGES_DIR)
         
         # 统计信息
         self.stats = {
@@ -210,10 +212,20 @@ class DocumentConverter:
             输出文件路径
         """
         input_path = Path(input_file)
-        # 使用与图片文件夹相同的文件名清理逻辑，确保命名一致性
-        safe_filename = self.image_processor._sanitize_filename(input_path.stem)
-        output_filename = f"{safe_filename}.md"
-        return str(Path(Config.OUTPUT_DIR) / output_filename)
+        # 对于MD输出文件，使用与目录名相同的规范化逻辑
+        from .utils.filename_normalizer import FilenameNormalizer
+        if Config.FILENAME_NORMALIZATION['enabled']:
+            # 使用文档名进行规范化，确保与目录名一致
+            # 传递 is_document_title=True 来避免截断，保持完整名称
+            safe_stem = FilenameNormalizer.normalize_filename(input_path.stem, is_document_title=True)
+            safe_filename = f"{safe_stem}.md"
+        else:
+            # 使用传统方法处理文件名
+            from .document_processors import WordDocumentProcessor
+            temp_processor = WordDocumentProcessor("temp")
+            safe_filename = f"{temp_processor._sanitize_filename(input_path.stem)}.md"
+        
+        return str(Path(Config.OUTPUT_DIR) / safe_filename)
     
     def _optimize_pdf_content(self, content: str) -> str:
         """
@@ -323,9 +335,8 @@ class DocumentConverter:
             Optional[str]: Markdown 内容，失败时返回 None
         """
         try:
-            from PIL import Image
+            from .document_processors import DocumentProcessorFactory
             import os
-            import shutil
             
             # 验证图片文件
             if not os.path.exists(input_file):
@@ -337,173 +348,27 @@ class DocumentConverter:
             file_name = file_path.name
             file_stem = file_path.stem
             
-            # 创建文档专属的图片目录（与Word文件处理方式一致）
-            doc_image_dir = self.image_processor._create_document_image_dir(file_stem)
+            # 使用DocumentProcessorFactory创建图片处理器
+            processor = DocumentProcessorFactory.create_processor(input_file, self.image_processor.images_dir)
             
-            # 对图片文件名也应用清理逻辑，确保与文件夹名一致
-            safe_image_name = self.image_processor._sanitize_filename(file_name)
-            target_image_path = doc_image_dir / safe_image_name
+            # 创建文档专属的图片目录
+            doc_image_dir = processor._create_document_image_dir(file_stem)
             
-            # 复制原始图片到images目录
-            try:
-                # 确保目标目录存在
-                target_image_path.parent.mkdir(parents=True, exist_ok=True)
-                self.logger.debug(f"目标目录已创建: {target_image_path.parent}")
-                
-                # 检查源文件
-                if not os.path.exists(input_file):
-                    self.logger.error(f"源文件不存在: {input_file}")
-                    return None
-                    
-                source_size = os.path.getsize(input_file)
-                self.logger.debug(f"源文件大小: {source_size} 字节")
-                
-                # 复制文件
-                shutil.copy2(input_file, target_image_path)
-                self.logger.debug(f"执行复制操作: {input_file} -> {target_image_path}")
-                
-                # 验证复制是否成功
-                if target_image_path.exists():
-                    target_size = target_image_path.stat().st_size
-                    self.logger.debug(f"目标文件大小: {target_size} 字节")
-                    if target_size > 0 and target_size == source_size:
-                        self.logger.info(f"图片已成功复制到: {target_image_path}")
-                    else:
-                        self.logger.error(f"图片复制验证失败: 大小不匹配 源:{source_size} 目标:{target_size}")
-                        return None
-                else:
-                    self.logger.error(f"图片复制验证失败: 目标文件不存在 {target_image_path}")
-                    return None
-            except Exception as e:
-                self.logger.error(f"复制图片失败: {e}")
-                import traceback
-                self.logger.error(f"详细错误信息: {traceback.format_exc()}")
+            # 提取图片（实际上是复制图片文件）
+            extracted_images = processor.extract_images(input_file, doc_image_dir)
+            
+            if not extracted_images:
+                self.logger.error(f"图片文件处理失败: {input_file}")
                 return None
             
-            # 使用清理后的文件名获取相对路径
-            relative_image_path = self.image_processor._get_relative_image_path(file_stem, safe_image_name)
+            # 使用处理器生成Markdown内容（传入空内容，让处理器生成完整内容）
+            processed_content, images_count = processor.process_content("", file_stem, extracted_images)
             
-            # 再次验证文件是否存在（防止被后续处理清理）
-            if not target_image_path.exists():
-                self.logger.warning(f"警告：图片文件在处理后消失: {target_image_path}")
-                # 重新复制一次
-                try:
-                    shutil.copy2(input_file, target_image_path)
-                    self.logger.info(f"重新复制图片成功: {target_image_path}")
-                except Exception as e:
-                    self.logger.error(f"重新复制图片失败: {e}")
-                    return None
-            
-            try:
-                # 尝试打开图片获取尺寸信息
-                with Image.open(input_file) as img:
-                    width, height = img.size
-                    format_info = img.format or "Unknown"
-                    mode = img.mode
-                    
-                self.logger.info(f"图片信息: {file_name} ({width}x{height}, {format_info}, {mode})")
-                
-                # 创建 Markdown 内容
-                markdown_content = f"""# {file_stem}
-
-## 图片信息
-
-- **文件名**: {file_name}
-- **尺寸**: {width} x {height} 像素
-- **格式**: {format_info}
-- **颜色模式**: {mode}
-- **文件大小**: {os.path.getsize(input_file)} 字节
-
-## 图片预览
-
-![image_{file_stem}]({relative_image_path})
-
----
-
-*此文档由 MarkItDown 自动生成*
-"""
-                
-                return markdown_content
-                
-            except Exception as img_error:
-                self.logger.warning(f"无法读取图片详细信息: {img_error}")
-                
-                # 创建简化的 Markdown 内容
-                markdown_content = f"""# {file_stem}
-
-## 图片文件
-
-- **文件名**: {file_name}
-- **文件大小**: {os.path.getsize(input_file)} 字节
-
-## 图片预览
-
-![image_{file_stem}]({relative_image_path})
-
----
-
-*此文档由 MarkItDown 自动生成*
-"""
-                
-                return markdown_content
-                
-        except ImportError:
-            self.logger.warning("PIL 库未安装，使用简化的图片处理")
-            
-            # 创建基础的 Markdown 内容
-            file_path = Path(input_file)
-            file_name = file_path.name
-            file_stem = file_path.stem
-            
-            # 创建文档专属的图片目录（与Word文件处理方式一致）
-            doc_image_dir = self.image_processor._create_document_image_dir(file_stem)
-            
-            # 对图片文件名也应用清理逻辑，确保与文件夹名一致
-            safe_image_name = self.image_processor._sanitize_filename(file_name)
-            target_image_path = doc_image_dir / safe_image_name
-            
-            # 复制原始图片到images目录
-            try:
-                import shutil
-                # 确保目标目录存在
-                target_image_path.parent.mkdir(parents=True, exist_ok=True)
-                
-                # 复制文件
-                shutil.copy2(input_file, target_image_path)
-                
-                # 验证复制是否成功
-                if target_image_path.exists() and target_image_path.stat().st_size > 0:
-                    self.logger.info(f"图片已成功复制到: {target_image_path}")
-                else:
-                    self.logger.error(f"图片复制验证失败: {target_image_path}")
-                    return None
-            except Exception as e:
-                self.logger.error(f"复制图片失败: {e}")
-                return None
-            
-            # 使用清理后的文件名获取相对路径
-            relative_image_path = self.image_processor._get_relative_image_path(file_stem, safe_image_name)
-            
-            markdown_content = f"""# {file_stem}
-
-## 图片文件
-
-- **文件名**: {file_name}
-- **文件大小**: {os.path.getsize(input_file)} 字节
-
-## 图片预览
-
-![{file_stem}]({relative_image_path})
-
----
-
-*此文档由 MarkItDown 自动生成*
-"""
-            
-            return markdown_content
+            self.logger.info(f"图片Markdown内容生成成功: {file_name}")
+            return processed_content
             
         except Exception as e:
-            self.logger.error(f"创建图片 Markdown 失败: {e}")
+            self.logger.error(f"创建图片Markdown失败: {str(e)}")
             return None
     
     def _try_alternative_docx_conversion(self, input_file: str) -> Optional[str]:
@@ -597,7 +462,45 @@ class DocumentConverter:
             self.logger.info(f"LibreOffice转换异常: {e}")
         
         return None
-    
+
+    def _try_image_based_pdf_conversion(self, input_file: str) -> Optional[str]:
+        """
+        尝试处理图片型PDF文档
+        
+        Args:
+            input_file: PDF文件路径
+            
+        Returns:
+            Optional[str]: 生成的Markdown内容，如果失败则返回None
+        """
+        try:
+            from .document_processors import DocumentProcessorFactory
+            
+            # 创建PDF处理器
+            processor = DocumentProcessorFactory.create_processor(input_file, Config.IMAGES_DIR)
+            
+            # 创建输出目录
+            document_name = Path(input_file).stem
+            output_dir = Path(Config.OUTPUT_DIR) / "images" / document_name
+            output_dir.mkdir(parents=True, exist_ok=True)
+            
+            # 提取图片
+            extracted_images = processor.extract_images(input_file, output_dir)
+            
+            if not extracted_images:
+                self.logger.warning(f"未从PDF中提取到任何图片: {input_file}")
+                return None
+            
+            # 处理内容（空内容，触发图片型PDF处理）
+            markdown_content, images_count = processor.process_content("", document_name, extracted_images)
+            
+            self.logger.info(f"图片型PDF处理完成: 提取{images_count}张图片")
+            return markdown_content
+            
+        except Exception as e:
+            self.logger.error(f"图片型PDF处理失败: {e}")
+            return None
+
     def convert_document(self, input_file: str) -> Dict[str, Any]:
         """
         转换单个文档
@@ -730,25 +633,45 @@ python main.py "{Path(input_file).with_suffix('.pdf')}"
                                 result['error'] = f"DOCX格式问题且无法创建说明文档: {str(e)}"
                             return result
                     else:
-                        result['error'] = f"MarkItDown 转换异常: {str(e)}"
-                        self.logger.error(result['error'])
-                        return result
+                        # 检查是否为PDF文件且是图片型PDF
+                        if input_file.lower().endswith('.pdf') and "返回空内容" in str(e):
+                            self.logger.warning(f"检测到可能的图片型PDF，尝试图片提取: {input_file}")
+                            
+                            # 尝试图片型PDF处理
+                            image_based_content = self._try_image_based_pdf_conversion(input_file)
+                            
+                            if image_based_content:
+                                markdown_content = image_based_content
+                                self.logger.info(f"图片型PDF转换成功: {input_file}")
+                            else:
+                                result['error'] = f"PDF文档无法提取内容或图片: {str(e)}"
+                                self.logger.error(result['error'])
+                                return result
+                        else:
+                            result['error'] = f"MarkItDown 转换异常: {str(e)}"
+                            self.logger.error(result['error'])
+                            return result
             
             # 生成输出路径
             output_path = self._get_output_path(input_file)
             result['output_file'] = output_path
             
-            # 处理图片 - 使用与输出文件名一致的清理后文件名
-            document_name = self.image_processor._sanitize_filename(Path(input_file).stem)
+            # 处理图片 - 使用文件名作为文档名称
+            document_name = Path(input_file).stem
             # 对于图片文件，跳过图片处理步骤（因为已经在 _create_image_markdown 中处理）
-            if file_ext not in image_extensions:
+            # 对于图片型PDF，也跳过图片处理步骤（因为已经在 _try_image_based_pdf_conversion 中处理）
+            if file_ext not in image_extensions and not (input_file.lower().endswith('.pdf') and "**注意**: 这是一个图片型PDF文档" in markdown_content):
                 processed_content, images_count = self.image_processor.process_images(
                     markdown_content, document_name, input_file
                 )
             else:
-                # 图片文件不需要额外的图片处理
+                # 图片文件或图片型PDF不需要额外的图片处理
                 processed_content = markdown_content
-                images_count = 1  # 图片文件本身算作一个处理的图片
+                # 对于图片型PDF，从内容中计算图片数量
+                if input_file.lower().endswith('.pdf') and "**注意**: 这是一个图片型PDF文档" in markdown_content:
+                    images_count = markdown_content.count('![图片')
+                else:
+                    images_count = 1  # 图片文件本身算作一个处理的图片
             result['images_extracted'] = images_count
             
             # 清理和优化内容
@@ -881,19 +804,78 @@ python main.py "{Path(input_file).with_suffix('.pdf')}"
 
 
 if __name__ == '__main__':
-    # 测试转换器
+    import argparse
+    import sys
+    
+    # 创建命令行参数解析器
+    parser = argparse.ArgumentParser(description='MarkItDown 文档转换器')
+    parser.add_argument('input_file', nargs='?', help='要转换的输入文件路径')
+    parser.add_argument('--output', '-o', help='输出文件路径（可选）')
+    parser.add_argument('--verbose', '-v', action='store_true', help='显示详细信息')
+    parser.add_argument('--batch', '-b', help='批量转换目录路径')
+    parser.add_argument('--formats', action='store_true', help='显示支持的文件格式')
+    
+    args = parser.parse_args()
+    
+    # 创建转换器
     converter = DocumentConverter()
     
-    # 显示支持的格式
-    print("支持的文件格式:")
-    for fmt in converter.get_supported_formats():
-        print(f"  {fmt}")
+    # 如果请求显示支持的格式
+    if args.formats or not args.input_file:
+        print("支持的文件格式:")
+        for fmt in converter.get_supported_formats():
+            print(f"  {fmt}")
+        
+        if not args.input_file:
+            print("\n使用方法: python -m src.converter <输入文件路径>")
+            print("示例: python -m src.converter 'input/document.docx'")
+            sys.exit(0)
     
-    # 测试单文件转换（如果有测试文件）
-    test_file = "test.pdf"
-    if os.path.exists(test_file):
-        print(f"\n测试转换文件: {test_file}")
-        result = converter.convert_document(test_file)
-        print(f"转换结果: {'成功' if result['success'] else '失败'}")
-        if result['error']:
-            print(f"错误信息: {result['error']}")
+    # 处理批量转换
+    if args.batch:
+        batch_dir = Path(args.batch)
+        if not batch_dir.exists():
+            print(f"错误: 批量转换目录不存在: {args.batch}")
+            sys.exit(1)
+        
+        # 获取目录中的所有支持文件
+        input_files = []
+        for file_path in batch_dir.rglob('*'):
+            if file_path.is_file() and file_path.suffix.lower() in converter.get_supported_formats():
+                input_files.append(str(file_path))
+        
+        if not input_files:
+            print(f"错误: 在目录 {args.batch} 中未找到支持的文件")
+            sys.exit(1)
+        
+        print(f"开始批量转换 {len(input_files)} 个文件...")
+        results = converter.convert_batch(input_files)
+        
+        # 显示结果统计
+        success_count = sum(1 for r in results if r['success'])
+        print(f"\n批量转换完成: {success_count}/{len(input_files)} 个文件成功")
+        
+        if args.verbose:
+            for result in results:
+                status = "成功" if result['success'] else "失败"
+                print(f"  {result['input_file']}: {status}")
+                if result['error']:
+                    print(f"    错误: {result['error']}")
+    
+    # 处理单文件转换
+    elif args.input_file:
+        if not os.path.exists(args.input_file):
+            print(f"错误: 输入文件不存在: {args.input_file}")
+            sys.exit(1)
+        
+        print(f"开始转换文件: {args.input_file}")
+        result = converter.convert_document(args.input_file)
+        
+        if result['success']:
+            print(f"转换成功!")
+            print(f"输出文件: {result['output_file']}")
+            if args.verbose and result.get('images_processed'):
+                print(f"处理图片数量: {result['images_processed']}")
+        else:
+            print(f"转换失败: {result['error']}")
+            sys.exit(1)

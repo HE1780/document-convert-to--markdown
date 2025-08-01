@@ -18,6 +18,15 @@ coloredlogs>=15.0              # 彩色日志
 click>=8.0.0                   # 命令行接口
 pyyaml>=6.0                    # YAML 配置文件支持
 requests>=2.26.0               # HTTP 请求（用于下载等）
+pypinyin>=0.55.0               # 中文转拼音（文件名规范化）
+python-dotenv>=0.19.0          # 环境变量配置文件支持
+
+# 图片和PDF处理依赖
+PyMuPDF>=1.23.0                # PDF文档处理和图片提取
+Pillow>=9.0.0                  # 图片处理库（PIL的现代版本）
+
+# 系统监控依赖
+psutil>=5.8.0                  # 系统资源监控（CPU、内存等）
 
 # 开发和测试
 pytest>=6.2.0                  # 测试框架
@@ -31,4 +40,4 @@ python-docx>=0.8.11           # Word 文档处理（备选方法）
 
 # 可选：LLM 集成（用于图片描述生成）
 # openai>=1.0.0                 # OpenAI API 客户端
-# anthropic>=0.3.0              # Anthropic Claude API 客户端
+# anthropic>=0.7.0              # Anthropic Claude API 客户端# anthropic>=0.7.0              # Anthropic Claude API 客户端

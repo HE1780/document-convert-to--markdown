@@ -153,6 +153,10 @@ temp/
 logs/
 *.log
 
+# Input files (may contain sensitive data)
+input/
+!input/.gitkeep
+
 # Test files
 
 # Obsidian configuration files

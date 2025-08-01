@@ -39,6 +39,10 @@ python main.py document.pdf --enable-llm
 
 - **多格式支持**: PDF, Word, PowerPoint, Excel, 图片, 音频, 网页等 20+ 种格式
 - **智能图片处理**: 自动提取和保存文档中的图片，支持 base64 和 URL 图片
+- **智能图片引用匹配**: 支持多种图片引用格式的智能识别和匹配
+  - 严格格式匹配："图 X-Y"、"表 X-Y"、"Figure X-Y" 等带数字的精确引用
+  - 关键词匹配："如图"、"见图"、"流程图"、"示意图" 等常见引用表达
+  - 上下文智能定位：基于关键词和上下文信息进行图片位置推断
 - **LLM 集成**: 可选集成 OpenAI GPT 或 Anthropic Claude 进行图片描述生成
 - **Azure 文档智能**: 支持 Azure Document Intelligence 进行高质量 PDF 处理
 - **批量转换**: 支持单文件和目录批量转换
@@ -163,6 +167,16 @@ python main.py document.pdf --use-azure-doc-intel
 python main.py document.pdf --enable-llm
 ```
 
+#### 场景5：智能图片引用匹配
+```bash
+# 系统自动识别文档中的图片引用并智能插入
+# 支持的引用格式：
+# - "图 2-1"、"表 3-2"、"Figure 1.1" 等精确格式
+# - "如图所示"、"见图"、"流程图"、"示意图" 等关键词
+# - "诊疗流程"、"上图"、"下图" 等上下文表达
+python main.py document.pdf --verbose
+```
+
 ### 🛠️ 命令行参数详解
 
 ```bash
@@ -234,11 +248,13 @@ markitdown/
 ├── requirements.txt          # 依赖包列表
 ├── test_markitdown.py       # 部署测试脚本
 ├── README.md                # 项目说明文档
+├── WORK_PROGRESS.md         # 工作进度文档
 ├── 开发方案.md               # 开发方案文档
 ├── PRD.md                   # 产品需求文档
 ├── src/                     # 源代码目录（项目核心）
 │   ├── config.py            # 配置管理
 │   ├── converter.py         # 文档转换器
+│   ├── document_processors.py # 文档处理器（架构重构）
 │   ├── image_processor.py   # 图片处理器
 │   ├── logger.py            # 日志管理器
 │   └── path_manager.py      # 路径管理器
@@ -335,6 +351,36 @@ markitdown test_document.txt
 - ✅ Azure 文档智能配置检查
 - ✅ 项目结构完整性验证
 
+## 🏗️ 技术架构
+
+### 架构重构亮点
+
+本项目经过完整的架构重构，实现了**完全分离的文档处理架构**：
+
+#### 🔧 核心组件
+
+- **`BaseDocumentProcessor`**: 抽象基类，定义统一接口和通用方法
+- **`WordDocumentProcessor`**: 专门处理Word文档图片提取
+- **`PDFDocumentProcessor`**: 专门处理PDF文档，包含智能插入功能
+- **`ImageDocumentProcessor`**: 专门处理图片文件，支持图片到Markdown的转换
+- **`DocumentProcessorFactory`**: 工厂类，根据文件类型创建相应处理器
+- **`ImageProcessor`**: 重构为协调器角色，通过委托实现功能
+
+#### ✨ 技术特点
+
+- **完全分离**: Word、PDF和图片处理逻辑完全独立，避免相互干扰
+- **图片文件支持**: 支持单个图片文件转换为Markdown格式，包含OCR文字识别
+- **一致性**: 文件命名、存储位置和输出位置保持统一
+- **可维护性**: 清晰的类结构，易于扩展和维护
+- **向后兼容**: 保持原有接口，不影响现有调用
+- **错误处理**: 添加了详细的调试日志和错误处理机制
+
+#### 🧪 验证结果
+
+- **Word文档**: 成功提取88张图片，图片在正确位置显示
+- **PDF文档**: 成功提取102张图片，智能插入功能正常工作
+- **图片存储**: 统一的命名规则和目录结构
+
 ## 📊 性能特性
 
 - **并发处理**: 支持多线程并发转换，提高批量处理效率
@@ -342,6 +388,7 @@ markitdown test_document.txt
 - **进度显示**: 实时显示转换进度和性能统计
 - **错误恢复**: 单个文件转换失败不影响批量处理继续进行
 - **缓存机制**: 智能缓存机制，避免重复转换相同文件
+- **智能插入**: PDF文档支持基于引用模式的智能图片插入
 
 ## 🔒 安全特性
 
@@ -420,9 +467,10 @@ python test_markitdown.py
 
 ---
 
-**版本**: 1.0.0  
-**最后更新**: 2025-01-01  
-**维护者**: Assistant
+**版本**: 1.1.0 (架构重构版)  
+**最后更新**: 2025-08-02  
+**维护者**: Assistant  
+**重构完成**: ✅ 文档处理架构完全分离
 
 ## 贡献指南
 

@@ -16,6 +16,7 @@ from typing import Union, List, Optional
 from datetime import datetime
 
 from .logger import get_logger
+from .config import Config
 
 logger = get_logger(__name__)
 
@@ -83,17 +84,22 @@ class PathManager:
             logger.error(f"创建目录失败 {dir_path}: {e}")
             raise
     
-    def safe_filename(self, filename: str, max_length: int = 255) -> str:
+    def safe_filename(self, filename: str, max_length: int = None) -> str:
         """
         生成安全的文件名
         
         Args:
             filename: 原始文件名
-            max_length: 最大长度
+            max_length: 最大长度，如果为None则使用配置中的默认值
             
         Returns:
             安全的文件名
         """
+        # 如果未指定最大长度，使用配置中的默认值
+        if max_length is None:
+            # 从配置中获取默认值
+            max_length = Config.DIRECTORY_NAMING['filename_limits']['max_filename_length']
+        
         # 移除或替换不安全的字符
         unsafe_chars = '<>:"/\\|?*'
         safe_name = filename

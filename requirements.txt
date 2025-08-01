@@ -1,0 +1,34 @@
+# MarkItDown 文档转换工具依赖包
+
+# 核心转换库 - Microsoft MarkItDown
+markitdown[all]>=0.1.2         # Microsoft MarkItDown 完整版（包含所有可选依赖）
+
+# 可选依赖（已包含在 markitdown[all] 中，此处仅作说明）
+# markitdown[pdf]               # PDF 文档支持
+# markitdown[docx]              # Word 文档支持
+# markitdown[pptx]              # PowerPoint 支持
+# markitdown[xlsx]              # Excel 支持
+# markitdown[audio-transcription] # 音频转录支持
+# markitdown[youtube-transcription] # YouTube 转录支持
+# markitdown[az-doc-intel]      # Azure 文档智能支持
+
+# 项目特定依赖
+tqdm>=4.62.0                   # 进度条显示
+coloredlogs>=15.0              # 彩色日志
+click>=8.0.0                   # 命令行接口
+pyyaml>=6.0                    # YAML 配置文件支持
+requests>=2.26.0               # HTTP 请求（用于下载等）
+
+# 开发和测试
+pytest>=6.2.0                  # 测试框架
+pytest-cov>=3.0.0              # 测试覆盖率
+black>=22.0.0                  # 代码格式化
+flake8>=4.0.0                  # 代码风格检查
+isort>=5.10.0                  # 导入排序
+
+# 备选转换方法依赖
+python-docx>=0.8.11           # Word 文档处理（备选方法）
+
+# 可选：LLM 集成（用于图片描述生成）
+# openai>=1.0.0                 # OpenAI API 客户端
+# anthropic>=0.3.0              # Anthropic Claude API 客户端

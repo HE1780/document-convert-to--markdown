@@ -154,6 +154,12 @@ logs/
 *.log
 
 # Test files
+
+# Obsidian configuration files
+.obsidian/
+
+# Images and media files (if not needed for project)
+images/
 test_*.py
 test_*.md
 *_test.py

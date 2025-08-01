@@ -8,7 +8,7 @@
 
 ```bash
 # 1. 克隆并进入项目
-git clone <repository-url> && cd markitdown
+git clone https://github.com/HE1780/document-convert-to--markdown.git && cd document-convert-to--markdown
 
 # 2. 一键安装
 python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt
@@ -81,8 +81,8 @@ python main.py document.pdf --enable-llm
 
 ```bash
 # 1. 克隆项目
-git clone <repository-url>
-cd markitdown
+git clone https://github.com/HE1780/document-convert-to--markdown.git
+cd document-convert-to--markdown
 
 # 2. 创建虚拟环境
 python3 -m venv .venv
@@ -92,7 +92,10 @@ source .venv/bin/activate  # macOS/Linux
 # 3. 安装依赖
 pip install -r requirements.txt
 
-# 4. 验证安装
+# 4. 创建input目录（如需要）
+mkdir -p input
+
+# 5. 验证安装
 python test_markitdown.py
 ```
 
@@ -138,6 +141,9 @@ python main.py document.pdf
 
 #### 场景2：批量转换文档
 ```bash
+# 创建 input/ 目录（如果不存在）
+mkdir -p input
+
 # 将所有文档放入 input/ 目录，然后批量转换
 python main.py input/
 
